@@ -1,72 +1,77 @@
 # Configuration for synthetic review generation
 
 # Number of reviews to generate
-num_reviews: 10
+num_reviews: 100
 
-# Rating distribution (should sum to 1.0)
+# Rating distribution from AllProductReviews.csv
 rating_distribution:
-  1: 0.05  # 5% - Very negative
-  2: 0.10  # 10% - Negative
-  3: 0.20  # 20% - Neutral
-  4: 0.35  # 35% - Positive
-  5: 0.30  # 30% - Very positive
+  # 1: 0.173886
+  # 2: 0.065495
+  # 3: 0.104834
+  # 4: 0.222431
+  # 5: 0.433354
+  1: 0.2
+  2: 0.2
+  3: 0.2
+  4: 0.2
+  5: 0.2
 
-# Reviewer personas
+# Headphone-specific reviewer personas
 personas:
-  - name: "casual_buyer"
-    description: "Someone who buys shoes occasionally for everyday use"
+  - name: "audiophile"
+    description: "Sound quality purist who cares about frequency response and clarity"
     traits:
-      - "focuses on comfort and price"
-      - "uses simple language"
-      - "mentions daily activities"
+      - "critically analyzes soundstage and imaging"
+      - "mentions highs, mids, and lows"
+      - "discusses technical audio specs"
     
-  - name: "athlete"
-    description: "Active person who uses shoes for sports and training"
+  - name: "fitness_enthusiast"
+    description: "Uses earphones during intensive workouts and running"
     traits:
-      - "emphasizes performance and durability"
-      - "mentions specific activities (running, gym, basketball)"
-      - "technical vocabulary about fit and support"
+      - "focuses on fit stability and sweat resistance"
+      - "mentions bass for workout motivation"
+      - "values durability and long battery life"
     
-  - name: "fashion_conscious"
-    description: "Style-focused buyer who cares about appearance"
+  - name: "wfh_professional"
+    description: "Uses headphones for long zoom calls and focused office work"
     traits:
-      - "discusses aesthetics and trends"
-      - "mentions outfit matching"
-      - "uses fashion terminology"
+      - "emphasizes mic quality and comfort for 8+ hours"
+      - "mentions background noise cancellation"
+      - "values reliable multi-device connectivity"
     
-  - name: "budget_shopper"
-    description: "Price-sensitive buyer looking for value"
+  - name: "bass_head"
+    description: "Loves EDM and hip-hop, cares mostly about heavy bass"
     traits:
-      - "emphasizes price and deals"
-      - "compares to other products"
-      - "mentions durability for the price"
+      - "uses informal, enthusiastic language"
+      - "specifically mentions 'thumping bass' or 'deep lows'"
+      - "less critical of technical clarity, more focusing on impact"
     
-  - name: "professional"
-    description: "Someone buying shoes for work environment"
+  - name: "budget_commuter"
+    description: "Daily traveler looking for decent sound at a low price"
     traits:
-      - "focuses on professionalism and comfort for long hours"
-      - "mentions office or workplace context"
-      - "values quality and longevity"
+      - "compares value for money extensively"
+      - "mentions using them in public transport"
+      - "straightforward and practical writing style"
 
 # Review characteristics
 review_length:
   min_words: 5
-  max_words: 150
+  max_words: 50
 
 # Temperature settings for generation
 generation_params:
-  temperature: 0.8
-  max_tokens: 1000
+  temperature: 0.75
+  max_tokens: 70
   top_p: 0.9
 
-# Product context (can be customized)
+# Product context (aligned with boAt/Sennheiser/JBL headphones in CSV)
 product_context:
-  category: "shoes"
+  category: "Wireless Bluetooth Earphones/Headphones"
   aspects:
-    - "comfort"
-    - "fit"
-    - "quality"
-    - "style"
-    - "durability"
-    - "price"
-    - "sizing"
+    - "sound quality"
+    - "battery life"
+    - "bass performance"
+    - "connectivity range"
+    - "mic quality"
+    - "noise cancellation"
+    - "ear bud comfort"

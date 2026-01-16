@@ -121,23 +121,26 @@ class QualityReporter:
         from sklearn.metrics.pairwise import cosine_similarity
         import numpy as np
         
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        
-        synthetic_embeddings = model.encode(synthetic_reviews)
-        real_embeddings = model.encode(real_reviews)
-        
-        # Calculate cross-similarities
-        cross_similarities = cosine_similarity(synthetic_embeddings, real_embeddings)
-        
-        # For each synthetic review, find max similarity to any real review
-        max_similarities = np.max(cross_similarities, axis=1)
-        
-        return {
-            'avg_max_similarity': round(float(np.mean(max_similarities)), 4),
-            'min_similarity': round(float(np.min(max_similarities)), 4),
-            'max_similarity': round(float(np.max(max_similarities)), 4),
-            'interpretation': 'High similarity (>0.7) may indicate copying; very low (<0.3) may indicate unrealistic content'
-        }
+        try:
+            model = SentenceTransformer('all-MiniLM-L6-v2')
+            synthetic_embeddings = model.encode(synthetic_reviews)
+            real_embeddings = model.encode(real_reviews)
+            cross_similarities = cosine_similarity(synthetic_embeddings, real_embeddings)
+            max_similarities = np.max(cross_similarities, axis=1)
+            
+            return {
+                'avg_max_similarity': round(float(np.mean(max_similarities)), 4),
+                'min_similarity': round(float(np.min(max_similarities)), 4),
+                'max_similarity': round(float(np.max(max_similarities)), 4),
+                'interpretation': 'High similarity (>0.7) may indicate copying; very low (<0.3) may indicate unrealistic content'
+            }
+        except Exception as e:
+            print(f"⚠️  Comparator: Semantic similarity failed (offline or timeout): {str(e)}")
+            return {
+                'avg_max_similarity': 0.0,
+                'status': 'Skipped (offline/timeout)',
+                'interpretation': 'Semantic comparison unavailable'
+            }
     
     def _calculate_quality_score(self, diversity: Dict, bias: Dict, realism: Dict) -> Dict:
         """

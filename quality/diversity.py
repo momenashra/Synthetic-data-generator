@@ -69,7 +69,7 @@ class DiversityAnalyzer:
             'type_token_ratio': round(ttr, 4),
             'unique_tokens': unique_tokens,
             'total_tokens': total_tokens,
-            'avg_unique_per_review': round(avg_unique_per_review, 2),
+            'avg_unique_per_review': round(float(avg_unique_per_review), 2),
             'top_10_token_ratio': round(top_10_ratio, 4)
         }
     

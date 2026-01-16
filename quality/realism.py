@@ -55,7 +55,7 @@ class RealismAnalyzer:
             'total_reviews': total_reviews,
             'coverage_rate': round(coverage_rate, 4),
             'avg_mentions_per_aspect': round(sum(aspect_mentions.values()) / len(self.aspects), 2) if self.aspects else 0,
-            'has_good_coverage': coverage_rate > 0.6
+            'has_good_coverage': bool(coverage_rate > 0.6)
         }
     
     def analyze_readability(self, reviews: List[str]) -> Dict[str, any]:
@@ -94,7 +94,7 @@ class RealismAnalyzer:
             'min_score': round(min(flesch_scores), 2),
             'max_score': round(max(flesch_scores), 2),
             'interpretation': self._interpret_flesch_score(avg_score),
-            'is_natural': 50 <= avg_score <= 90  # Reasonable range for reviews
+            'is_natural': bool(50 <= avg_score <= 90)  # Reasonable range for reviews
         }
     
     def _interpret_flesch_score(self, score: float) -> str:
@@ -155,7 +155,7 @@ class RealismAnalyzer:
             'reviews_with_ai_patterns': reviews_with_ai_patterns,
             'total_reviews': total_reviews,
             'ai_pattern_rate': round(ai_pattern_rate, 4),
-            'is_realistic': ai_pattern_rate < 0.05,  # Less than 5% is acceptable
+            'is_realistic': bool(ai_pattern_rate < 0.05),  # Less than 5% is acceptable
             'examples': pattern_matches[:3]
         }
     
@@ -184,7 +184,7 @@ class RealismAnalyzer:
             'reviews_with_pronouns': reviews_with_pronouns,
             'total_reviews': total_reviews,
             'pronoun_usage_rate': round(pronoun_rate, 4),
-            'is_natural': pronoun_rate > 0.5  # Most real reviews use first person
+            'is_natural': bool(pronoun_rate > 0.5)  # Most real reviews use first person
         }
     
     def analyze(self, reviews: List[str]) -> Dict[str, any]:
@@ -215,5 +215,5 @@ class RealismAnalyzer:
             'readability': readability_analysis,
             'ai_patterns': ai_pattern_analysis,
             'pronoun_usage': pronoun_analysis,
-            'overall_realistic': is_realistic
+            'overall_realistic': bool(is_realistic)
         }

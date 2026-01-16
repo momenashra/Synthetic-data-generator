@@ -47,7 +47,7 @@ class BiasAnalyzer:
             'expected_distribution': {k: round(v, 4) for k, v in expected_dist.items()},
             'deviations': deviations,
             'total_deviation': round(total_deviation, 4),
-            'is_biased': total_deviation > 0.15  # Threshold for significant bias
+            'is_biased': bool(total_deviation > 0.15)  # Threshold for significant bias
         }
     
     def analyze_sentiment_consistency(self, reviews: List[Dict]) -> Dict[str, any]:
@@ -100,7 +100,7 @@ class BiasAnalyzer:
             'total_reviews': len(reviews),
             'inconsistencies_found': len(inconsistencies),
             'inconsistency_rate': round(len(inconsistencies) / len(reviews), 4) if reviews else 0,
-            'is_consistent': len(inconsistencies) / len(reviews) < 0.1 if reviews else True,
+            'is_consistent': bool(len(inconsistencies) / len(reviews) < 0.1) if reviews else True,
             'examples': inconsistencies[:5]  # Show first 5 examples
         }
     
@@ -149,7 +149,7 @@ class BiasAnalyzer:
             'unique_reviews': unique_reviews,
             'duplicate_rate': round(duplicate_rate, 4),
             'repetitive_phrases': repetitive_phrases,
-            'has_repetition_issues': len(repetitive_phrases) > 5 or duplicate_rate > 0.05
+            'has_repetition_issues': bool(len(repetitive_phrases) > 5 or duplicate_rate > 0.05)
         }
     
     def analyze_length_distribution(self, reviews: List[str]) -> Dict[str, any]:
@@ -169,7 +169,7 @@ class BiasAnalyzer:
             'std_length': round(np.std(lengths), 2),
             'min_length': min(lengths),
             'max_length': max(lengths),
-            'is_too_uniform': np.std(lengths) < 10  # Very low variance is suspicious
+            'is_too_uniform': bool(np.std(lengths) < 10)  # Very low variance is suspicious
         }
     
     def analyze(self, reviews: List[Dict], expected_rating_dist: Dict[int, float]) -> Dict[str, any]:

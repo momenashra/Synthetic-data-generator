@@ -1,69 +1,119 @@
 from langgraph.graph import StateGraph, END
-from typing import TypedDict, Optional, Dict, List
-from models.azure_openai_generator import AzureOpenAIGenerator
-from models.azure_openai_reviewer import AzureOpenAIReviewer
-from quality.quality_report import QualityReporter
+from typing import TypedDict, Optional, Dict, List, Any
+from agents import PlannerAgent, GeneratorAgent, ReviewerAgent, ComparatorAgent
 import json
 from datetime import datetime
 from dotenv import load_dotenv
+import os
+import sys
+import yaml
+import numpy as np
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
 
-# ----- 1. Define state -----
+# ----- 1. State Definition -----
 class ReviewState(TypedDict):
-    persona: dict
-    rating: int
+    total_reviews: int
+    plan: List[Dict[str, Any]]
+    current_index: int
+    
+    detailed_plan: Optional[Dict[str, Any]]  # New field for per-review detailed plan
+    persona: Optional[Dict]
+    rating: Optional[int]
     review: Optional[str]
     quality_assessment: Optional[Dict]
     attempt: int
     max_attempts: int
-    all_reviews: List[Dict]  # Track all generated reviews for reporting
-
-
-# ----- 2. Load Azure OpenAI Generator & Reviewer -----
-config = {
-    "generation_params": {
-        "max_tokens": 200,
-        "temperature": 0.8,
-        "top_p": 0.9
-    },
-    "review_params": {
-        "max_tokens": 1000,
-        "temperature": 0.3,
-        "top_p": 0.9
-    },
-    "product_context": {
-        "category": "product",
-        "aspects": ["quality", "price", "service", "experience"]
-    },
-    "rating_distribution": {
-        1: 0.05,
-        2: 0.10,
-        3: 0.20,
-        4: 0.35,
-        5: 0.30
-    }
-}
-
-generator = AzureOpenAIGenerator(config=config)
-reviewer = AzureOpenAIReviewer(config=config)
-quality_reporter = QualityReporter(config=config)
-
-
-# ----- 3. Node: Generate Review -----
-def generate_review_node(state: ReviewState) -> ReviewState:
-    """Generate a review using Azure OpenAI."""
-    print(f"\n🔄 Attempt {state['attempt'] + 1}/{state['max_attempts']}: Generating review...")
     
-    review = generator.generate_review(
-        rating=state["rating"],
-        persona=state["persona"],
-        real_reviews=[]  # Can pass real reviews for context if available
+    all_synthetic_reviews: List[Dict]
+    real_reviews: List[str]
+    comparison_report: Optional[Dict]
+
+
+# ----- 2. Initialization -----
+
+def load_config(config_path: str = 'config/generation_config.yaml') -> Dict:
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+    return {}
+
+config = load_config()
+provider = os.getenv('LLM_PROVIDER', 'google').lower() # Renamed to LLM_PROVIDER as per user request
+
+# Instantiate Agents
+planner = PlannerAgent(config=config)
+generator_agent = GeneratorAgent(config=config, provider=provider)
+reviewer_agent = ReviewerAgent(config=config, provider=provider) 
+comparator_agent = ComparatorAgent(config=config)
+
+
+# ----- 3. Nodes -----
+
+def planner_node(state: ReviewState) -> ReviewState:
+    print(f"\n╔══════════════════════════════════════════════════════════════╗")
+    print(f"║ 📋 GLOBAL PLANNER AGENT                                      ║")
+    print(f"╠══════════════════════════════════════════════════════════════╣")
+    print(f"║ Task: Batch Plan for {state['total_reviews']} reviews")
+    
+    plan = planner.plan_batch(state['total_reviews'])
+    
+    print(f"║ Plan Details:")
+    for idx, item in enumerate(plan):
+        print(f"║   {idx+1}. {item['rating']}⭐ - {item['persona']['name']}")
+    print(f"╚══════════════════════════════════════════════════════════════╝")
+    
+    return {
+        **state,
+        "plan": plan,
+        "current_index": 0,
+        "all_synthetic_reviews": [],
+        "detailed_plan": None
+    }
+
+def review_planner_node(state: ReviewState) -> ReviewState:
+    """Detailed planner for a SINGLE review."""
+    current_item = state['plan'][state['current_index']]
+    
+    print(f"\n╔══════════════════════════════════════════════════════════════╗")
+    print(f"║ 📝 REVIEW PLANNER AGENT                                      ║")
+    print(f"╠══════════════════════════════════════════════════════════════╣")
+    
+    feedback = None
+    if state["attempt"] > 0:
+        feedback = ", ".join(state["quality_assessment"].get("issues", []))
+        print(f"║ ⚠️  RETRYING with Feedback: {feedback}")
+
+    detailed_plan = planner.create_detailed_plan(
+        rating=current_item['rating'],
+        persona=current_item['persona'],
+        feedback=feedback
     )
     
-    print(f"✅ Generated review: {review[:100]}...")
+    print(f"║ 🗺️  Detailed Plan Created")
+    print(f"╚══════════════════════════════════════════════════════════════╝")
+    
+    return {
+        **state,
+        "detailed_plan": detailed_plan
+    }
+
+def generator_node(state: ReviewState) -> ReviewState:
+    plan = state['detailed_plan']
+    
+    print(f"\n┌──────────────────────────────────────────────────────────────┐")
+    print(f"│ 🔄 GENERATOR AGENT (Executor)                                │")
+    print(f"├──────────────────────────────────────────────────────────────┤")
+    print(f"│ Item: {state['current_index'] + 1}/{state['total_reviews']} (Attempt {state['attempt'] + 1}/{state['max_attempts']})")
+    
+    review = generator_agent.execute_plan(
+        plan=plan,
+        real_reviews=state.get('real_reviews', [])
+    )
+    print(f"│ Generated: \"{review[:50]}...\"")
+    print(f"└──────────────────────────────────────────────────────────────┘")
     
     return {
         **state,
@@ -71,184 +121,181 @@ def generate_review_node(state: ReviewState) -> ReviewState:
         "attempt": state["attempt"] + 1
     }
 
-
-# ----- 4. Node: Evaluate using Azure OpenAI Reviewer -----
-def guardrail_check_node(state: ReviewState) -> ReviewState:
-    """Review the generated content using Azure OpenAI reviewer."""
-    print(f"🔍 Reviewing generated content...")
+def reviewer_node(state: ReviewState) -> ReviewState:
+    print(f"\n┌──────────────────────────────────────────────────────────────┐")
+    print(f"│ 🔍 REVIEWER AGENT                                            │")
+    print(f"├──────────────────────────────────────────────────────────────┤")
     
-    try:
-        assessment = reviewer.review_generated_content(
-            review_text=state["review"],
-            rating=state["rating"],
-            persona=state["persona"]
-        )
-        
-        print(f"📊 Quality Assessment:")
-        print(f"   - Overall Score: {assessment.get('overall_score', 0)}/10")
-        print(f"   - Pass: {assessment.get('pass', False)}")
-        
-        if assessment.get('issues'):
-            print(f"   - Issues: {', '.join(assessment['issues'][:3])}")
-        
-        return {**state, "quality_assessment": assessment}
-        
-    except Exception as e:
-        print(f"⚠️  Error during review: {str(e)}")
-        # If review fails, mark as failed assessment
-        return {
-            **state,
-            "quality_assessment": {
-                "pass": False,
-                "overall_score": 0,
-                "issues": [f"Review error: {str(e)}"]
-            }
-        }
-
-
-# ----- 5. Edge Condition -----
-def check_quality_transition(state: ReviewState) -> str:
-    """Determine next step based on quality assessment."""
-    assessment = state.get("quality_assessment", {})
-    passed = assessment.get("pass", False)
+    assessment = reviewer_agent.review_review(
+        review_text=state["review"],
+        rating=state["detailed_plan"]["target_rating"],
+        persona={"name": state["detailed_plan"]["persona_name"]} 
+    )
     
-    if passed:
-        print("✅ Review passed quality check!")
-        return "good"
-    elif state["attempt"] >= state["max_attempts"]:
-        print(f"⚠️  Max attempts ({state['max_attempts']}) reached. Accepting review.")
-        return "give_up"
-    else:
-        print(f"🔄 Quality check failed. Retrying...")
-        return "retry"
+    score = assessment.get('overall_score', 0)
+    passed = assessment.get('pass', False)
+    issues = assessment.get('issues', [])
+    
+    print(f"│ Quality Score: {score}/10")
+    print(f"│ Verdict: {'✅ PASS' if passed else '❌ FAIL'}")
+    if issues:
+        print(f"│ Issues Found:")
+        for issue in issues:
+            print(f"│   - {issue}")
+            
+    print(f"└──────────────────────────────────────────────────────────────┘")
+    return {**state, "quality_assessment": assessment}
+
+def finalize_node(state: ReviewState) -> ReviewState:
+    action = "✅ Accepted" if state["quality_assessment"].get("pass") else "⚠️ Accepted (Poor Quality)"
+    print(f"\n[System]: Review {state['current_index'] + 1} finalized -> {action}")
+    
+    review_data = {
+        "text": state["review"],
+        "rating": state["detailed_plan"]["target_rating"],
+        "persona": state["detailed_plan"]["persona_name"],
+        "provider": generator_agent.get_name(),
+        "attempts": state["attempt"],
+        "quality_assessment": state["quality_assessment"],
+        "generated_at": datetime.now().isoformat()
+    }
+    
+    all_synthetic = state.get("all_synthetic_reviews", [])
+    all_synthetic.append(review_data)
+    
+    return {
+        **state,
+        "all_synthetic_reviews": all_synthetic,
+        "current_index": state["current_index"] + 1,
+        "attempt": 0,
+        "review": None,
+        "detailed_plan": None,
+        "quality_assessment": None
+    }
+
+async def run_mcp_tool(tool_name: str, arguments: dict):
+    """Run a tool via MCP stdio client."""
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.getcwd() + os.pathsep + env.get("PYTHONPATH", "")
+
+    server_params = StdioServerParameters(
+        command=sys.executable,
+        args=["tools/mcp_server.py"],
+        env=env
+    )
+    
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(tool_name, arguments)
+            return result.content[0].text
+
+def comparator_node(state: ReviewState) -> ReviewState:
+    print(f"\n╔══════════════════════════════════════════════════════════════╗")
+    print(f"║ ⚖️  COMPARATOR AGENT & MCP CLIENT                             ║")
+    print(f"╠══════════════════════════════════════════════════════════════╣")
+    
+    import asyncio
+    
+    # 1. Compare Dataset
+    print(f"║ 🛠️  MCP Client: Calling 'compare_dataset'...")
+    comparison_str = asyncio.run(run_mcp_tool("compare_dataset", {
+        "synthetic_reviews": state["all_synthetic_reviews"],
+        "real_reviews": state["real_reviews"]
+    }))
+    comparison = eval(comparison_str) 
+    print(f"║    Verdict: {comparison.get('verdict', 'Analysis Complete')}")
+    print(f"║    Similarity: {comparison.get('similarity_to_real', {}).get('avg_max_similarity', 0)}")
+    
+    # 2. Evaluate Batch
+    print(f"║ 🛠️  MCP Client: Calling 'evaluate_reviews'...")
+    report_str = asyncio.run(run_mcp_tool("evaluate_reviews", {
+        "reviews": state["all_synthetic_reviews"]
+    }))
+    full_report = eval(report_str)
+    
+    # 3. Save Report
+    print(f"║ 🛠️  MCP Client: Calling 'save_report'...")
+    save_msg = asyncio.run(run_mcp_tool("save_report", {
+        "report_data": full_report,
+        "output_path": "data/quality_report.json"
+    }))
+    print(f"║    {save_msg}")
+    
+    print(f"╚══════════════════════════════════════════════════════════════╝")
+    
+    return {
+        **state,
+        "comparison_report": comparison
+    }
 
 
-# ----- 6. Build LangGraph -----
+# ----- 4. Edges -----
+
+def check_quality(state: ReviewState) -> str:
+    if state.get("quality_assessment", {}).get("pass", False):
+        return "accept"
+    # If failed, go back to PLANNER (review_planner) if attempts remain
+    return "retry_plan" if state["attempt"] < state["max_attempts"] else "accept_poor"
+
+def check_batch(state: ReviewState) -> str:
+    return "continue" if state["current_index"] < len(state["plan"]) else "finish"
+
+
+# ----- 5. Build Graph -----
+
 builder = StateGraph(ReviewState)
 
-builder.add_node("generate_review", generate_review_node)
-builder.add_node("guardrail_check", guardrail_check_node)
+builder.add_node("planner", planner_node)
+builder.add_node("review_planner", review_planner_node)
+builder.add_node("generator", generator_node)
+builder.add_node("reviewer", reviewer_node)
+builder.add_node("finalize", finalize_node)
+builder.add_node("comparator", comparator_node)
 
-builder.set_entry_point("generate_review")
+builder.set_entry_point("planner")
 
-# Define flow
-builder.add_edge("generate_review", "guardrail_check")
+builder.add_edge("planner", "review_planner")
+builder.add_edge("review_planner", "generator")
+builder.add_edge("generator", "reviewer")
+
 builder.add_conditional_edges(
-    "guardrail_check",
-    check_quality_transition,  # Condition function as positional argument
+    "reviewer",
+    check_quality,
     {
-        "good": END,
-        "retry": "generate_review",
-        "give_up": END
+        "accept": "finalize", 
+        "accept_poor": "finalize", 
+        "retry_plan": "review_planner"  # Back to planner on failure!
     }
 )
+
+builder.add_conditional_edges(
+    "finalize",
+    check_batch,
+    {"continue": "review_planner", "finish": "comparator"}
+)
+
+builder.add_edge("comparator", END)
 
 graph = builder.compile()
 
 
-# ----- 7. Helper Functions -----
-def run_review_generation(persona: Dict, rating: int, max_attempts: int = 3) -> Dict:
-    """
-    Run the review generation workflow for a single review.
-    
-    Args:
-        persona: Persona dictionary
-        rating: Rating (1-5)
-        max_attempts: Maximum regeneration attempts
-        
-    Returns:
-        Final state dictionary with generated review and assessment
-    """
+def run_agentic_workflow(num_reviews: int, real_reviews: List[str] = None):
     initial_state = {
-        "persona": persona,
-        "rating": rating,
+        "total_reviews": num_reviews,
+        "plan": [],
+        "current_index": 0,
+        "persona": None,
+        "rating": None,
         "review": None,
         "quality_assessment": None,
         "attempt": 0,
-        "max_attempts": max_attempts,
-        "all_reviews": []
+        "max_attempts": 3,
+        "detailed_plan": None,
+        "all_synthetic_reviews": [],
+        "real_reviews": real_reviews or []
     }
-    
-    print(f"\n{'='*60}")
-    print(f"Starting review generation for {persona.get('name', 'Unknown')} - Rating: {rating}/5")
-    print(f"{'='*60}")
-    
-    final_state = graph.invoke(initial_state)
-    
-    print(f"\n{'='*60}")
-    print(f"Review generation complete!")
-    print(f"Total attempts: {final_state['attempt']}")
-    print(f"{'='*60}\n")
-    
-    return final_state
-
-
-def generate_batch_reviews(personas: List[Dict], num_reviews: int = 10, max_attempts: int = 3) -> List[Dict]:
-    """
-    Generate multiple reviews and return them with metadata.
-    
-    Args:
-        personas: List of persona dictionaries
-        num_reviews: Number of reviews to generate
-        max_attempts: Maximum regeneration attempts per review
-        
-    Returns:
-        List of review dictionaries with metadata
-    """
-    import random
-    
-    reviews = []
-    
-    for i in range(num_reviews):
-        # Select random persona and rating
-        persona = random.choice(personas)
-        rating = generator.select_rating()
-        
-        print(f"\n{'#'*60}")
-        print(f"Review {i+1}/{num_reviews}")
-        print(f"{'#'*60}")
-        
-        # Run generation workflow
-        result = run_review_generation(persona, rating, max_attempts)
-        
-        # Store review with metadata
-        review_data = {
-            "text": result["review"],
-            "rating": result["rating"],
-            "persona": result["persona"],
-            "provider": generator.get_provider_name(),
-            "attempts": result["attempt"],
-            "quality_assessment": result["quality_assessment"],
-            "generated_at": datetime.now().isoformat()
-        }
-        
-        reviews.append(review_data)
-    
-    return reviews
-
-
-def generate_quality_report(reviews: List[Dict], output_path: str = "quality_report.json"):
-    """
-    Generate a comprehensive quality report for the generated reviews.
-    
-    Args:
-        reviews: List of review dictionaries
-        output_path: Path to save the report
-        
-    Returns:
-        Quality report dictionary
-    """
-    print(f"\n{'='*60}")
-    print("Generating Quality Report")
-    print(f"{'='*60}\n")
-    
-    report = quality_reporter.generate_report(reviews)
-    
-    # Save report
-    quality_reporter.save_report(report, output_path)
-    print(f"📄 Report saved to: {output_path}")
-    
-    # Print summary
-    quality_reporter.print_summary(report)
-    
-    return report
+    return graph.invoke(initial_state)

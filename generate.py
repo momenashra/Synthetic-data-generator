@@ -7,7 +7,7 @@ import yaml
 from typing import List, Dict
 from tqdm import tqdm
 from dotenv import load_dotenv
-from models.azure_openai_generator import AzureOpenAIGenerator
+from build_graph import run_agentic_workflow
 
 
 
@@ -20,105 +20,64 @@ def load_config(config_path: str = 'config/generation_config.yaml') -> Dict:
         return yaml.safe_load(f)
 
 
-def load_real_reviews(jsonl_path: str = 'data/real_reviews.jsonl') -> List[str]:
-    """Load real reviews from JSONL file."""
+def load_real_reviews(file_path: str = 'data/balanced_reviews_500.csv') -> List[str]:
+    """Load real reviews from CSV or JSONL file."""
     reviews = []
-    with open(jsonl_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            review_obj = json.loads(line)
-            # Extract review text from the JSON object
-            # Support both 'text' and 'review_text' fields
-            review_text = review_obj.get('text') or review_obj.get('review_text') or review_obj.get('reviewText', '')
-            if review_text:
-                reviews.append(review_text)
-    return reviews
+    if not os.path.exists(file_path):
+        # Try fallback to JSONL if default CSV not found
+        if file_path == 'data/balanced_reviews_500.csv' and os.path.exists('data/real_reviews.jsonl'):
+            file_path = 'data/real_reviews.jsonl'
+        else:
+            print(f"Warning: {file_path} not found. Running without real review context.")
+            return []
 
-
-
-def create_generator(provider: str, config: Dict):
-    """
-    Create a generator instance based on provider.
-    
-    Args:
-        provider: Provider name (only 'azure' supported)
-        config: Configuration dictionary
-        
-    Returns:
-        Generator instance
-    """
-    if provider.lower() in ['azure', 'azure_openai']:
-        return AzureOpenAIGenerator(config)
+    if file_path.endswith('.csv'):
+        import pandas as pd
+        df = pd.read_csv(file_path)
+        # Assuming 'ReviewBody' is the column name based on analysis
+        if 'ReviewBody' in df.columns:
+            reviews = df['ReviewBody'].astype(str).tolist()
+        elif 'text' in df.columns:
+            reviews = df['text'].astype(str).tolist()
     else:
-        raise ValueError(f"Unknown provider: {provider}. Only 'azure' is supported.")
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    review_obj = json.loads(line)
+                    review_text = review_obj.get('text') or review_obj.get('review_text') or review_obj.get('reviewText', '')
+                    if review_text:
+                        reviews.append(review_text)
+                except:
+                    continue
+    return reviews
 
 
 
 def generate_reviews(
     num_reviews: int,
-    provider: str = 'azure',
     config_path: str = 'config/generation_config.yaml',
-    real_reviews_path: str = 'data/real_reviews.jsonl',
+    real_reviews_path: str = 'data/balanced_reviews_500.csv',
     output_path: str = 'data/generated_reviews.jsonl'
 ) -> List[Dict]:
     """
-    Generate synthetic reviews.
-    
-    Args:
-        num_reviews: Number of reviews to generate
-        provider: LLM provider to use
-        config_path: Path to configuration file
-        real_reviews_path: Path to real reviews JSONL
-        output_path: Path to save generated reviews
-        
-    Returns:
-        List of generated review dictionaries
+    Generate synthetic reviews using the agentic workflow.
     """
-    # Load configuration and real reviews
-    config = load_config(config_path)
+    # Load real reviews for the Comparator
     real_reviews = load_real_reviews(real_reviews_path)
     
-    # Create generator
-    generator = create_generator(provider, config)
+    # Run the full agentic workflow
+    print(f"\n🚀 Starting Agentic Review Generation Strategy...")
+    result = run_agentic_workflow(
+        num_reviews=num_reviews,
+        real_reviews=real_reviews
+    )
     
-    print(f"\nGenerating {num_reviews} synthetic reviews using {generator.get_provider_name()}...")
-    print(f"Real reviews loaded: {len(real_reviews)}")
-    print(f"Personas available: {len(config['personas'])}")
+    generated_reviews = result.get("all_synthetic_reviews", [])
     
-    generated_reviews = []
-    
-    # Generate reviews with progress bar
-    for i in tqdm(range(num_reviews), desc="Generating reviews"):
-        # Select rating and persona
-        rating = generator.select_rating()
-        persona = generator.select_persona()
-        
-        try:
-            # Generate review
-            review_text = generator.generate_review(rating, persona, real_reviews)
-            
-            # Create review object
-            review_obj = {
-                'id': i + 1,
-                'rating': rating,
-                'text': review_text,
-                'persona': persona['name'],
-                'provider': generator.get_provider_name()
-            }
-            
-            generated_reviews.append(review_obj)
-            
-            # Save incrementally (in case of interruption)
-            if (i + 1) % 10 == 0:
-                save_reviews(generated_reviews, output_path)
-                
-        except Exception as e:
-            print(f"\nError generating review {i + 1}: {str(e)}")
-            continue
-    
-    # Final save
+    # Save results
     save_reviews(generated_reviews, output_path)
     
-    print(f"\n✓ Successfully generated {len(generated_reviews)} reviews")
+    print(f"\n✓ Workflow Complete. Generated {len(generated_reviews)} reviews.")
     print(f"✓ Saved to: {output_path}")
     
     return generated_reviews
@@ -144,15 +103,11 @@ if __name__ == '__main__':
     # Load environment variables
     load_dotenv()
     
-    # Get provider from environment or use default
-    provider = os.getenv('DEFAULT_PROVIDER', 'azure')
-    
     # Load config to get num_reviews
     config = load_config()
-    num_reviews = config.get('num_reviews', 100)
+    num_reviews = config.get('num_reviews', 10)
     
     # Generate reviews
     generate_reviews(
-        num_reviews=num_reviews,
-        provider=provider
+        num_reviews=num_reviews
     )
