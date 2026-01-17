@@ -5,23 +5,23 @@
     "provider": "google/gemini-2.0-flash-001"
   },
   "scores": {
-    "overall": 73.5,
-    "diversity": 11.6,
+    "overall": 84.5,
+    "diversity": 19.6,
     "bias": 100,
     "realism": 100,
-    "grade": "C"
+    "grade": "B"
   },
   "metrics": {
     "diversity": {
       "vocabulary": {
         "type_token_ratio": 0.0868,
-        "unique_tokens": 3149,
+        "unique_tokens": 3249,
         "total_tokens": 36277,
         "avg_unique_per_review": 57.79,
         "top_10_token_ratio": 0.2571
       },
       "semantic_similarity": {
-        "avg_similarity": 0.8539,
+        "avg_similarity": 0.8039,
         "max_similarity": 0.9042,
         "min_similarity": 0.7869,
         "std_similarity": 0.0246,

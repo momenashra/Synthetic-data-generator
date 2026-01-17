@@ -12,6 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from generate import generate_reviews
 from models.review_storage import ReviewStorage
+from quality.quality_report import QualityReporter
 
 @click.group()
 def cli():
@@ -148,17 +149,103 @@ def compare():
 
 
 @click.command()
-def migrate():
+@click.option('--file', '-f', required=False, help='Path to reviews file to migrate (optional)')
+def migrate(file):
     """Migrate existing reviews to new embedding format."""
     click.echo("📦 Migrating reviews...")
-    storage = ReviewStorage()
+    
+    reviews_path = file if file else 'data/generated_reviews.jsonl'
+    
+    # Auto-deduce embedding path
+    dir_name = os.path.dirname(reviews_path)
+    base_name = os.path.basename(reviews_path)
+    
+    if base_name.startswith('generated_reviews_'):
+        # e.g. generated_reviews_groq_llama.jsonl -> review_embeddings_groq_llama.npy
+        slug = base_name.replace('generated_reviews_', '').replace('.jsonl', '')
+        embedding_file = f'review_embeddings_{slug}.npy'
+    else:
+        # Fallback: reviews.jsonl -> review_embeddings.npy (or simply reviews_embeddings.npy)
+        embedding_file = base_name.replace('.jsonl', '_embeddings.npy').replace('.json', '_embeddings.npy')
+        
+    embeddings_path = os.path.join(dir_name, embedding_file)
+    
+    click.echo(f"   Input:  {reviews_path}")
+    click.echo(f"   Output: {embeddings_path}")
+    
+    from models.review_storage import get_review_storage
+    # Force initialize storage with these specific paths
+    storage = get_review_storage(
+        reviews_path=reviews_path, 
+        embeddings_path=embeddings_path, 
+        force_restart=True
+    )
+    
     count = storage.migrate_existing_reviews()
     click.echo(f"✅ Migrated {count} reviews.")
+
+@click.command()
+@click.option('--file', '-f', required=False, help='Path to reviews file')
+def report(file):
+    """Generate quality report for a specific reviews file."""
+    click.echo("📊 Generating quality report...")
+    
+    reviews_path = file if file else 'data/generated_reviews.jsonl'
+    
+    if not os.path.exists(reviews_path):
+        click.echo(f"❌ File not found: {reviews_path}")
+        return
+
+    # Extract slug for report naming
+    basename = os.path.basename(reviews_path)
+    slug = basename.replace('generated_reviews_', '').replace('.jsonl', '').replace('.json', '')
+    if slug == basename: 
+         slug = 'custom'
+    
+    report_path = f"data/quality_report_{slug}.json"
+    
+    # Load reviews
+    reviews = []
+    try:
+        with open(reviews_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    reviews.append(json.loads(line))
+    except Exception as e:
+        click.echo(f"❌ Error reading reviews: {e}")
+        return
+                
+    if not reviews:
+        click.echo("❌ No reviews found in file.")
+        return
+
+    click.echo(f"   Input: {reviews_path}")
+    click.echo(f"   Count: {len(reviews)}")
+    
+    # Initialize reporter 
+    config = {
+        'product_context': {}, 
+        'rating_distribution': {}, 
+    }
+    
+    try:
+        reporter = QualityReporter(config)
+        report_data = reporter.generate_report(reviews)
+        
+        # Save
+        reporter.save_report(report_data, report_path)
+        click.echo(f"✅ Report saved to {report_path}")
+        
+        # Print summary
+        reporter.print_summary(report_data)
+    except Exception as e:
+        click.echo(f"❌ Error generating report: {e}")
 
 # Add commands to group
 cli.add_command(generate)
 cli.add_command(compare)
 cli.add_command(migrate)
+cli.add_command(report)
 
 if __name__ == '__main__':
     cli()

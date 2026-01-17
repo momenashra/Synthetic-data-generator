@@ -84,7 +84,17 @@ python cli.py generate --count 500
 3.  **Save**: Data is saved to `data/generated_reviews_<provider>_<model>.jsonl`.
 4.  **Report**: A quality report is auto-generated at `data/quality_report_<provider>_<model>.json`.
 
-### 2. Compare Models
+### 2. Generate Quality Report
+Generate a detailed quality report for a specific review file without running generation.
+
+```bash
+# Generate report for Groq reviews
+python cli.py report --file data/generated_reviews_groq_llama.jsonl
+```
+
+**Output**: `data/quality_report_groq_llama.json`
+
+### 3. Compare Models
 After running generation with different models/providers, use this to create a benchmark table.
 
 ```bash
@@ -100,7 +110,11 @@ python cli.py compare
 If you have existing reviews without embeddings, this utility generates them.
 
 ```bash
+# Migrate default data (data/generated_reviews.jsonl)
 python cli.py migrate
+
+# Targeted migration for a specific model file
+python cli.py migrate --file data/generated_reviews_groq_llama.jsonl
 ```
 
 ---

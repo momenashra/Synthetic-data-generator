@@ -1,0 +1,133 @@
+{
+  "metadata": {
+    "generated_at": "2026-01-17T20:56:29.270058",
+    "count": 103,
+    "provider": "groq_llama-3.1-8b-instant"
+  },
+  "scores": {
+    "overall": 74.6,
+    "diversity": 15.5,
+    "bias": 100,
+    "realism": 100,
+    "grade": "C"
+  },
+  "metrics": {
+    "diversity": {
+      "vocabulary": {
+        "type_token_ratio": 0.1647,
+        "unique_tokens": 1628,
+        "total_tokens": 9884,
+        "avg_unique_per_review": 72.42,
+        "top_10_token_ratio": 0.2536
+      },
+      "semantic_similarity": {
+        "avg_similarity": 0.8557,
+        "max_similarity": 0.9379,
+        "min_similarity": 0.7891,
+        "std_similarity": 0.0257,
+        "embedding_diversity": 0.1443
+      },
+      "tfidf_similarity": {
+        "avg_tfidf_similarity": 0.0568,
+        "std_tfidf_similarity": 0.0471
+      },
+      "lexical_diversity": {
+        "distinct_1": 0.1647,
+        "distinct_2": 0.5586,
+        "distinct_3": 0.7977,
+        "ngram_entropy_2": 8.1054,
+        "normalized_ngram_entropy_2": 0.9418,
+        "compression_ratio_diversity": 0.3154
+      },
+      "dcscore": 0.0112,
+      "cluster_inertia": 10.9,
+      "syntactic_diversity": {
+        "cr_pos_diversity": 0.2147
+      }
+    },
+    "bias": {
+      "rating_distribution": {
+        "actual_distribution": {
+          "1": 0.2621,
+          "2": 0.2136,
+          "3": 0.165,
+          "4": 0.1456,
+          "5": 0.2136
+        },
+        "expected_distribution": {},
+        "deviations": {
+          "1": 0.2621,
+          "2": 0.2136,
+          "3": 0.165,
+          "4": 0.1456,
+          "5": 0.2136
+        },
+        "total_deviation": 0.9999,
+        "is_biased": true
+      },
+      "sentiment_consistency": {
+        "total_reviews": 103,
+        "inconsistencies_found": 0,
+        "inconsistency_rate": 0.0,
+        "is_consistent": true,
+        "examples": []
+      },
+      "repetitive_patterns": {
+        "total_reviews": 103,
+        "unique_reviews": 103,
+        "duplicate_rate": 0.0,
+        "repetitive_phrases": [],
+        "has_repetition_issues": false
+      },
+      "length_distribution": {
+        "avg_length": 72.18,
+        "std_length": 21.03,
+        "min_length": 20,
+        "max_length": 129,
+        "is_too_uniform": false
+      },
+      "overall_bias_detected": false
+    },
+    "realism": {
+      "aspect_coverage": {
+        "aspect_mentions": {},
+        "reviews_with_aspects": 0,
+        "total_reviews": 103,
+        "coverage_rate": 0.0,
+        "avg_mentions_per_aspect": 0,
+        "has_good_coverage": false
+      },
+      "readability": {
+        "avg_flesch_score": 40.0,
+        "min_score": -24.1,
+        "max_score": 76.16,
+        "interpretation": "Difficult",
+        "is_natural": false
+      },
+      "ai_patterns": {
+        "reviews_with_ai_patterns": 0,
+        "total_reviews": 103,
+        "ai_pattern_rate": 0.0,
+        "is_realistic": true,
+        "examples": []
+      },
+      "pronoun_usage": {
+        "reviews_with_pronouns": 87,
+        "total_reviews": 103,
+        "pronoun_usage_rate": 0.8447,
+        "is_natural": true
+      },
+      "overall_realistic": true
+    }
+  },
+  "comparison": null,
+  "recommendations": [
+    "⚠️ High semantic repetition. Increase temperature or variety in prompts."
+  ],
+  "model_performance": {
+    "total_time_seconds": 1287.50,
+    "avg_time_per_review": 12.50,
+    "reviews_generated": 103,
+    "model_name": "groq_llama-3.1-8b-instant"
+  }
+}
