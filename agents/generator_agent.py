@@ -33,11 +33,11 @@ class GeneratorAgent:
         self.product_context = config.get('product_context', {})
         
         if provider == 'groq':
-            self.client = GroqClient()
+            self.client = GroqClient(config)
         elif provider == 'ollama':
-            self.client = OllamaClient()
+            self.client = OllamaClient(config)
         elif provider == 'google':
-            self.client = GeminiClient()
+            self.client = GeminiClient(config)
         else:
             raise ValueError(f"Unknown provider: {provider}")
 
@@ -69,7 +69,7 @@ class GeneratorAgent:
         prompt += json.dumps(plan, indent=2)
         
         prompt += "\n\nCRITICAL CONSTRAINTS:"
-        prompt += "\n1. LENGTH: Review MUST be between 5 and 50 words. Be concise. NO fluff."
+        prompt += "\n1. LENGTH: You MUST follow this guideline: " + plan.get('length_guideline', 'Keep it concise') + ". Do not be overly verbose unless requested."
         prompt += "\n2. ASPECT COVERAGE: You MUST explicitly mention the 'focus_aspects' listed in the plan."
         prompt += "\n3. STYLE & CONTEXT: Adopt the 'writing_style' and mention the 'usage_location' naturally."
         prompt += "\n4. SYNTACTIC REQUIREMENT: You MUST follow this rule: " + plan.get('syntactic_requirement', 'None')

@@ -13,6 +13,7 @@ seaborn>=0.12.0
 
 # LangGraph for workflow orchestration
 langgraph>=0.0.20
+langchain>=1.0.0
 
 # NLP and similarity
 sentence-transformers>=2.2.0
@@ -26,7 +27,6 @@ python-dotenv>=1.0.0
 # Quality metrics
 textstat>=0.7.3
 
-# Observability and monitoring
-langfuse>=2.0.0  # Better for custom wrappers and explicit usage tracking
 
+mcp
 vertexai

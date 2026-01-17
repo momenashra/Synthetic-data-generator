@@ -20,8 +20,10 @@ class GroqClient:
     def call(self, prompt: str, **kwargs) -> str:
         """Make a raw completion call with retry logic for rate limits."""
         import time
-        max_retries = 3
-        retry_delay = 5
+        from groq import RateLimitError
+        
+        max_retries = 8  # Increased to handle longer wait times
+        retry_delay = 10 # Start with 10s delay
         
         params = {**self.default_params, **kwargs}
         
@@ -35,13 +37,15 @@ class GroqClient:
                     max_tokens=params.get('max_tokens', 200),
                 )
                 return chat_completion.choices[0].message.content.strip()
+            except RateLimitError as e:
+                # Calculate wait time needed if provided in error message, otherwise exp backoff
+                print(f"⚠️  Rate limit reached (Attempt {attempt+1}/{max_retries}). Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff: 10, 20, 40, 80, 160...
             except Exception as e:
-                if "429" in str(e) and attempt < max_retries - 1:
-                    print(f"⚠️  Rate limit reached. Retrying in {retry_delay}s...")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-                else:
-                    raise e
+                raise e
+        
+        raise Exception("Max retries exceeded for Groq API call.")
 
     def get_name(self) -> str:
         return f"groq_{self.model_name}"

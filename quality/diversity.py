@@ -14,9 +14,35 @@ import math
 import zlib
 from scipy.special import softmax
 from sklearn.cluster import KMeans
-from diversity import ngram_diversity_score, compression_ratio
 from models import EmbeddingClient
 import os
+
+def ngram_diversity_score(texts: List[str], n: int) -> float:
+    """Calculate the ratio of unique n-grams to total n-grams."""
+    ngrams_set = set()
+    total_ngrams = 0
+    
+    for text in texts:
+        tokens = text.split()
+        if len(tokens) >= n:
+            current_ngrams = [" ".join(tokens[i:i+n]) for i in range(len(tokens) - n + 1)]
+            ngrams_set.update(current_ngrams)
+            total_ngrams += len(current_ngrams)
+            
+    if total_ngrams == 0:
+        return 0.0
+    return len(ngrams_set) / total_ngrams
+
+def compression_ratio(texts: List[str]) -> float:
+    """Calculate gzip compression ratio (size original / size compressed)."""
+    if not texts:
+        return 0.0
+    combined_text = " ".join(texts).encode('utf-8')
+    compressed_data = zlib.compress(combined_text)
+    if len(compressed_data) == 0:
+        return 0.0
+    return len(combined_text) / len(compressed_data)
+
 class DiversityAnalyzer:
     """Analyzes diversity of synthetic reviews."""
     

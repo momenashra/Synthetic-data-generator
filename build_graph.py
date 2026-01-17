@@ -7,17 +7,12 @@ from typing import TypedDict, Optional, Dict, List, Any
 from agents import PlannerAgent, GeneratorAgent, ReviewerAgent, ComparatorAgent
 import json
 from datetime import datetime
+import time
 import yaml
 import numpy as np
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-try:
-    from monitoring.langfuse_monitoring import init_langfuse_monitoring, flush_langfuse
-    init_langfuse_monitoring()
-except ImportError:
-    flush_langfuse = None
-    print("LangFuse not available. Install with: pip install langfuse", file=sys.stderr)
 
 
 # ----- 1. State Definition -----
@@ -332,20 +327,8 @@ def run_agentic_workflow(num_reviews: int, real_reviews: List[str] = None):
     # Ensure agents are instantiated
     get_agents()
     
-    config = {}
-    callbacks = []
-    
-    # LangFuse callback
-    try:
-        from monitoring.langfuse_monitoring import get_langfuse_callback
-        langfuse_callback = get_langfuse_callback()
-        if langfuse_callback:
-            callbacks.append(langfuse_callback)
-    except ImportError:
-        pass
-    
-    if callbacks:
-        config["callbacks"] = callbacks
+    # Start timing
+    start_time = time.time()
 
     initial_state = {
         "total_reviews": num_reviews,
@@ -362,14 +345,20 @@ def run_agentic_workflow(num_reviews: int, real_reviews: List[str] = None):
         "real_reviews": real_reviews or []
     }
     
-    try:
-        result = graph.invoke(initial_state, config=config)
-        # Flush LangFuse events before ending
-        if flush_langfuse:
-            flush_langfuse()
-        return result
-    except Exception as e:
-        # Flush LangFuse events even on failure
-        if flush_langfuse:
-            flush_langfuse()
-        raise e
+    result = graph.invoke(initial_state)
+    
+    # Calculate timing metrics
+    end_time = time.time()
+    total_time = end_time - start_time
+    num_generated = len(result.get('all_synthetic_reviews', []))
+    avg_time = total_time / num_generated if num_generated > 0 else 0
+    
+    # Add performance metrics to result
+    result['model_performance'] = {
+        'total_time_seconds': round(total_time, 2),
+        'avg_time_per_review': round(avg_time, 2),
+        'reviews_generated': num_generated,
+        'model_name': os.getenv('MODEL_NAME', 'unknown')
+    }
+    
+    return result

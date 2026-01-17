@@ -192,9 +192,54 @@ class ReviewStorage:
 # Convenience function for global access
 _storage_instance: Optional[ReviewStorage] = None
 
-def get_review_storage() -> ReviewStorage:
-    """Get the global ReviewStorage instance."""
+def get_review_storage(
+    reviews_path: Optional[str] = None,
+    embeddings_path: Optional[str] = None,
+    force_restart: bool = False
+) -> ReviewStorage:
+    """
+    Get the global ReviewStorage instance.
+    
+    Args:
+        reviews_path: Optional custom path. If provided, checks if re-init needed.
+        embeddings_path: Optional custom path.
+        force_restart: Force re-initialization.
+        
+    Returns:
+        ReviewStorage instance.
+    """
     global _storage_instance
+    
+    # Defaults if we need to create a new instance but no paths provided
+    default_reviews = 'data/generated_reviews.jsonl'
+    default_embeddings = 'data/review_embeddings.npy'
+    
+    # Input normalization
+    target_reviews = reviews_path 
+    target_embeddings = embeddings_path
+    
+    should_reinit = False
+    
     if _storage_instance is None:
-        _storage_instance = ReviewStorage()
+        should_reinit = True
+        # Use defaults if not provided for first init
+        if target_reviews is None: target_reviews = default_reviews
+        if target_embeddings is None: target_embeddings = default_embeddings
+        
+    elif force_restart:
+        should_reinit = True
+        if target_reviews is None: target_reviews = default_reviews
+        if target_embeddings is None: target_embeddings = default_embeddings
+        
+    elif target_reviews is not None and _storage_instance.reviews_path != target_reviews:
+        # Only re-init if specific path requested differs from current
+        should_reinit = True
+        if target_embeddings is None: target_embeddings = default_embeddings
+
+    if should_reinit:
+        _storage_instance = ReviewStorage(
+            reviews_path=target_reviews, 
+            embeddings_path=target_embeddings
+        )
+        
     return _storage_instance

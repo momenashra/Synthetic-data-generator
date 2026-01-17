@@ -85,11 +85,11 @@ personas:
 generation_params:
   temperature: 1  # Slightly increased to encourage "less obvious" word choices [1, 5]
   top_p: 0.95        # Nucleus sampling to allow for a wider vocabulary [1, 5]
-  max_tokens: 100    # Increased from 70 to allow for more descriptive 
+  max_tokens: 200    # Increased from 70 to allow for more descriptive 
 # Review characteristics
 review_length:
-  min_words: 5
-  max_words: 50
+  min_words: 50
+  max_words: 200
 
 
 

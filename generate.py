@@ -48,32 +48,95 @@ def load_real_reviews(file_path: str = 'data/balanced_reviews_500.csv') -> List[
 
 
 
+def get_model_slug():
+    """Extract a clean model slug including provider and model name."""
+    provider = os.getenv('LLM_PROVIDER1', 'google').lower()
+    
+    if provider == 'groq':
+        model_name = os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
+    elif provider == 'ollama':
+        model_name = os.getenv('OLLAMA_MODEL', 'mistral')
+    else:
+        model_name = os.getenv('MODEL_NAME', 'unknown')
+
+    # Extract base model name (e.g., 'gemini-2.0-flash-001' -> 'gemini')
+    model_base = model_name.split('-')[0].split('/')[0].lower()
+    # Combine provider and model (e.g., 'google_gemini', 'groq_llama')
+    return f"{provider}_{model_base}"
+
+
 def generate_reviews(
     num_reviews: int,
     config_path: str = 'config/generation_config.yaml',
-    real_reviews_path: str = 'data/balanced_reviews_500.csv',
-    output_path: str = 'data/generated_reviews.jsonl'
+    real_reviews_path: str = 'data/balanced_reviews_500.csv'
 ) -> List[Dict]:
     """
     Generate synthetic reviews using the agentic workflow.
+    Saves to default path, then creates a copy with model name.
     """
+    model_slug = get_model_slug()
+    
+    # Define model-specific paths
+    model_reviews_path = f'data/generated_reviews_{model_slug}.jsonl'
+    model_embeddings_path = f'data/review_embeddings_{model_slug}.npy'
+    
+    # Enable provider-specific logging
+    provider = os.getenv('LLM_PROVIDER1', 'google').lower()
+    if provider == 'groq':
+        active_model = os.getenv('GROQ_MODEL', 'unknown')
+    elif provider == 'ollama':
+        active_model = os.getenv('OLLAMA_MODEL', 'unknown')
+    else:
+        active_model = os.getenv('MODEL_NAME', 'unknown')
+
+    # Initialize storage with specific paths BEFORE starting workflow
+    from models.review_storage import get_review_storage
+    get_review_storage(
+        reviews_path=model_reviews_path,
+        embeddings_path=model_embeddings_path,
+        force_restart=True
+    )
+
     # Load real reviews for the Comparator
     real_reviews = load_real_reviews(real_reviews_path)
     
     # Run the full agentic workflow
     print(f"\n Starting Agentic Review Generation Strategy...")
+    print(f"   Provider: {provider}")
+    print(f"   Model:    {active_model}")
+    print(f"   Storage:  {model_reviews_path}")
+    
     result = run_agentic_workflow(
         num_reviews=num_reviews,
         real_reviews=real_reviews
     )
     
     generated_reviews = result.get("all_synthetic_reviews", [])
-    
-    # Save results
-    save_reviews(generated_reviews, output_path)
+    model_performance = result.get("model_performance", {})
     
     print(f"\n✓ Workflow Complete. Generated {len(generated_reviews)} reviews.")
-    print(f"✓ Saved to: {output_path}")
+    print(f"✓ Saved to: {model_reviews_path}")
+    if model_performance:
+        print(f"⏱  Total time: {model_performance.get('total_time_seconds', 0):.1f}s")
+        print(f"⏱  Avg per review: {model_performance.get('avg_time_per_review', 0):.2f}s")
+    
+    # Auto-generate quality report
+    print(f"\n📊 Generating quality report...")
+    from quality.quality_report import QualityReporter
+    
+    config = load_config()
+    reporter = QualityReporter(config)
+    report_data = reporter.generate_report(generated_reviews, real_reviews[:50] if real_reviews else None)
+    
+    # Add model performance to report
+    report_data['model_performance'] = model_performance
+    
+    # Save report with model name only
+    report_base = f'data/quality_report_{model_slug}'
+    reporter.save_report(report_data, f"{report_base}.json")
+    
+    print(f"✅ Report saved: {report_base}.json")
+    reporter.print_summary(report_data)
     
     return generated_reviews
 
