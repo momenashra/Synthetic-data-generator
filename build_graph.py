@@ -17,7 +17,7 @@ try:
     init_langfuse_monitoring()
 except ImportError:
     flush_langfuse = None
-    print("LangFuse not available. Install with: pip install langfuse")
+    print("LangFuse not available. Install with: pip install langfuse", file=sys.stderr)
 
 
 # ----- 1. State Definition -----

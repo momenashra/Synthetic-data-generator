@@ -24,18 +24,18 @@ try:
     # Check version compatibility
     import langfuse as lf_module
     langfuse_version = getattr(lf_module, '__version__', 'unknown')
-    print(f"📦 LangFuse version: {langfuse_version}")
+    print(f"📦 LangFuse version: {langfuse_version}", file=sys.stderr)
     
     LANGFUSE_AVAILABLE = True
-    print("✅ LangFuse imported successfully")
+    print("✅ LangFuse imported successfully", file=sys.stderr)
     
 except ImportError as e:
-    print(f"⚠️  LangFuse not installed: {e}")
-    print(f"⚠️  Install with: pip install langfuse")
-    print(f"⚠️  Monitoring will be disabled.")
+    print(f"⚠️  LangFuse not installed: {e}", file=sys.stderr)
+    print(f"⚠️  Install with: pip install langfuse", file=sys.stderr)
+    print(f"⚠️  Monitoring will be disabled.", file=sys.stderr)
 except Exception as e:
-    print(f"⚠️  LangFuse initialization failed: {e}")
-    print(f"⚠️  Monitoring will be disabled.")
+    print(f"⚠️  LangFuse initialization failed: {e}", file=sys.stderr)
+    print(f"⚠️  Monitoring will be disabled.", file=sys.stderr)
 
 def check_pydantic_version():
     """Check Pydantic version for debugging."""
@@ -45,7 +45,7 @@ def check_pydantic_version():
         print(f"📦 Pydantic version: {pydantic_version}")
         return pydantic_version
     except ImportError:
-        print("⚠️  Pydantic not found")
+        print("⚠️  Pydantic not found", file=sys.stderr)
         return None
 
 def init_langfuse_monitoring():
@@ -53,7 +53,7 @@ def init_langfuse_monitoring():
     global langfuse_client
     
     if not LANGFUSE_AVAILABLE:
-        print("⚠️  LangFuse not available - skipping initialization")
+        print("⚠️  LangFuse not available - skipping initialization", file=sys.stderr)
         return None
     
     # Check Pydantic version for debugging
@@ -64,8 +64,8 @@ def init_langfuse_monitoring():
     langfuse_host = os.getenv("LANGFUSE_HOST") or os.getenv("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com"
     
     if not langfuse_secret_key or not langfuse_public_key:
-        print("⚠️  LANGFUSE_SECRET_KEY and LANGFUSE_PUBLIC_KEY not found in environment")
-        print("⚠️  Set these in your .env file to enable monitoring")
+        print("⚠️  LANGFUSE_SECRET_KEY and LANGFUSE_PUBLIC_KEY not found in environment", file=sys.stderr)
+        print("⚠️  Set these in your .env file to enable monitoring", file=sys.stderr)
         return None
     
     try:
@@ -74,17 +74,17 @@ def init_langfuse_monitoring():
             public_key=langfuse_public_key,
             host=langfuse_host
         )
-        print(f"🚀 LangFuse monitoring initialized successfully!")
-        print(f"   Host: {langfuse_host}")
-        print(f"   Public Key: {langfuse_public_key[:10]}...")
+        print(f"🚀 LangFuse monitoring initialized successfully!", file=sys.stderr)
+        print(f"   Host: {langfuse_host}", file=sys.stderr)
+        print(f"   Public Key: {langfuse_public_key[:10]}...", file=sys.stderr)
         return langfuse_client
         
     except Exception as e:
-        print(f"❌ Failed to initialize LangFuse client: {e}")
-        print(f"   This may be due to:")
-        print(f"   1. Invalid API keys")
-        print(f"   2. Network connectivity issues")
-        print(f"   3. Incorrect host URL")
+        print(f"❌ Failed to initialize LangFuse client: {e}", file=sys.stderr)
+        print(f"   This may be due to:", file=sys.stderr)
+        print(f"   1. Invalid API keys", file=sys.stderr)
+        print(f"   2. Network connectivity issues", file=sys.stderr)
+        print(f"   3. Incorrect host URL", file=sys.stderr)
         import traceback
         traceback.print_exc()
         return None
@@ -153,11 +153,11 @@ def log_llm_call_to_langfuse(
         # Return generation ID for tracking
         gen_id = generation.id if hasattr(generation, 'id') else None
         if gen_id:
-            print(f"✅ Logged to LangFuse - Generation ID: {gen_id}")
+            print(f"✅ Logged to LangFuse - Generation ID: {gen_id}", file=sys.stderr)
         return gen_id
         
     except Exception as e:
-        print(f"❌ Error logging LLM call to LangFuse: {e}")
+        print(f"❌ Error logging LLM call to LangFuse: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         return None
@@ -194,22 +194,22 @@ def flush_langfuse():
     global langfuse_client
     if langfuse_client:
         try:
-            print("🔄 Flushing LangFuse events...")
+            print("🔄 Flushing LangFuse events...", file=sys.stderr)
             langfuse_client.flush()
-            print("✅ LangFuse events flushed successfully")
+            print("✅ LangFuse events flushed successfully", file=sys.stderr)
         except Exception as e:
-            print(f"⚠️  Error flushing LangFuse: {e}")
+            print(f"⚠️  Error flushing LangFuse: {e}", file=sys.stderr)
 
 def shutdown_langfuse():
     """Properly shutdown LangFuse client."""
     global langfuse_client
     if langfuse_client:
         try:
-            print("🛑 Shutting down LangFuse...")
+            print("🛑 Shutting down LangFuse...", file=sys.stderr)
             langfuse_client.shutdown()
-            print("✅ LangFuse shutdown successfully")
+            print("✅ LangFuse shutdown successfully", file=sys.stderr)
         except Exception as e:
-            print(f"⚠️  Error shutting down LangFuse: {e}")
+            print(f"⚠️  Error shutting down LangFuse: {e}", file=sys.stderr)
 
 # Diagnostic function
 def diagnose_langfuse():

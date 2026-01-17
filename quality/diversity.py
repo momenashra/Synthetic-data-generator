@@ -4,6 +4,7 @@ Measures vocabulary overlap and semantic similarity.
 """
 from typing import List, Dict
 import numpy as np
+import nltk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 # SentenceTransformer now accessed via shared EmbeddingClient
@@ -139,7 +140,11 @@ class DiversityAnalyzer:
             return {}
 
         # --- Normalize text once ---
-        tokenized_reviews = self.tokenizer.tokenize(review.lower())
+        tokenized_reviews = []
+        for review in reviews:
+            tokens = self.tokenizer.tokenize(review.lower())
+            tokens = [t for t in tokens if t not in self.tokenizer.all_special_tokens]
+            tokenized_reviews.append(tokens)
 
         # Reconstruct normalized text for library calls
         normalized_reviews = [" ".join(tokens) for tokens in tokenized_reviews]

@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 from typing import List, Optional, Union
 import numpy as np
 import os
+import sys
 
 class EmbeddingClient:
     """
@@ -28,7 +29,7 @@ class EmbeddingClient:
     def _load_model(self):
         """Lazy load the model on first use."""
         if self._model is None:
-            print(f"🔧 Loading embedding model: {self.MODEL_NAME}...")
+            print(f"🔧 Loading embedding model: {self.MODEL_NAME}...", file=sys.stderr)
             self._model = SentenceTransformer(self.MODEL_NAME)
         return self._model
     
