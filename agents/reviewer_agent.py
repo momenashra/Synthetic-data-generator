@@ -4,7 +4,6 @@ Reviewer Agent for guardrail and quality checks.
 from typing import Dict, List, Optional, Any
 import json
 from models import GroqClient, OllamaClient, GeminiClient
-
 class ReviewerAgent:
     """Agent responsible for ensuring quality and realism."""
     
@@ -23,9 +22,9 @@ class ReviewerAgent:
             self.client = GroqClient(config) # Fallback should also take config
         self.product_context = config.get('product_context', {})
 
-    def review_review(self, review_text: str, rating: int, persona: Dict) -> Dict[str, Any]:
+    def review_review(self, review_text: str, rating: int, plan: Dict) -> Dict[str, Any]:
         """Evaluate the generated review."""
-        prompt = self._build_review_prompt(review_text, rating, persona)
+        prompt = self._build_review_prompt(review_text, rating, plan)
         response = self.client.call(prompt, temperature=0.2, max_tokens=500) # Lower temperature for consistency
         
         try:
@@ -48,25 +47,27 @@ class ReviewerAgent:
                 "raw_response": response
             }
 
-    def _build_review_prompt(self, text: str, rating: int, persona: Dict) -> str:
+    def _build_review_prompt(self, text: str, rating: int, plan: Dict) -> str:
         aspects = self.product_context.get('aspects', [])
         return f"""
-Evaluate this synthetic product review:
-Rating: {rating}
-Persona: {persona.get('name')}
-Review Text: "{text}"
+        Evaluate this synthetic product review:
+        Rating: {rating}
+        Detailed Plan: {json.dumps(plan, indent=2)}
+        Review Text: "{text}"
 
-Criteria:
-1. Consistency: Does the text match the {rating}-star rating?
-2. Persona: Does the tone match the persona traits?
-3. Realism: Does it sound like a real user or a standard AI response?
-4. Relevance: Does it mention relevant aspects: {aspects}?
+        Criteria:
+        1. Consistency: Does the text match the {rating}-star rating?
+        2. Persona & Style: Does the tone match the persona results and the requested'writing_style'?
+        3. Usage Context: Does it correctly reflect the 'usage_location'?
+        4. Semantic Anchors: Did it use any of the 'semantic_anchors' provided? (Preferable but not 100% mandatory if text is good)
+        5. Realism: Does it sound like a real user or a standard repetitive AI response?
+        6. Relevance: Does it mention relevant aspects: {aspects}?
 
-Respond ONLY with a JSON object:
-{{
-  "overall_score": (int 1-10),
-  "pass": (bool),
-  "issues": [list of strings],
-  "sentiment_score": (float -1 to 1)
-}}
-"""
+        Respond ONLY with a JSON object:
+        {{
+        "overall_score": (int 1-10),
+        "pass": (bool),
+        "issues": [list of strings],
+        "sentiment_score": (float -1 to 1)
+        }}
+        """

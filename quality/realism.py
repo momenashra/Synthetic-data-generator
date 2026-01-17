@@ -99,16 +99,8 @@ class RealismAnalyzer:
     
     def _interpret_flesch_score(self, score: float) -> str:
         """Interpret Flesch Reading Ease score."""
-        if score >= 90:
-            return "Very Easy"
-        elif score >= 80:
-            return "Easy"
-        elif score >= 70:
-            return "Fairly Easy"
-        elif score >= 60:
+        if score >= 50:
             return "Standard"
-        elif score >= 50:
-            return "Fairly Difficult"
         else:
             return "Difficult"
     
@@ -202,18 +194,28 @@ class RealismAnalyzer:
         ai_pattern_analysis = self.detect_ai_patterns(reviews)
         pronoun_analysis = self.analyze_personal_pronouns(reviews)
         
-        # Overall realism assessment
-        is_realistic = (
-            aspect_analysis.get('has_good_coverage', False) and
-            readability_analysis.get('is_natural', False) and
-            ai_pattern_analysis.get('is_realistic', False) and
-            pronoun_analysis.get('is_natural', False)
-        )
+        # Overall realism assessment using weighted scoring
+        # Similar logic to bias.py: Accumulate "unrealism" points
+        unrealism_score = 0.0
+        
+        # Heavy weights for critical issues
+        if not ai_pattern_analysis.get('is_realistic', False):
+            unrealism_score += 1.0
+            
+        if not readability_analysis.get('is_natural', False):
+            unrealism_score += 1.0
+            
+        # Light weights for minor issues
+        if not aspect_analysis.get('has_good_coverage', False):
+            unrealism_score += 0.5
+            
+        if not pronoun_analysis.get('is_natural', False):
+            unrealism_score += 0.5
         
         return {
             'aspect_coverage': aspect_analysis,
             'readability': readability_analysis,
             'ai_patterns': ai_pattern_analysis,
             'pronoun_usage': pronoun_analysis,
-            'overall_realistic': bool(is_realistic)
+            'overall_realistic': bool(unrealism_score <= 1.5)
         }

@@ -1,16 +1,23 @@
+from dotenv import load_dotenv
+import os
+import sys
+load_dotenv()
 from langgraph.graph import StateGraph, END
 from typing import TypedDict, Optional, Dict, List, Any
 from agents import PlannerAgent, GeneratorAgent, ReviewerAgent, ComparatorAgent
 import json
 from datetime import datetime
-from dotenv import load_dotenv
-import os
-import sys
 import yaml
 import numpy as np
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
-# Load environment variables
-load_dotenv()
+try:
+    from monitoring.langfuse_monitoring import init_langfuse_monitoring, flush_langfuse
+    init_langfuse_monitoring()
+except ImportError:
+    flush_langfuse = None
+    print("LangFuse not available. Install with: pip install langfuse")
 
 
 # ----- 1. State Definition -----
@@ -19,7 +26,7 @@ class ReviewState(TypedDict):
     plan: List[Dict[str, Any]]
     current_index: int
     
-    detailed_plan: Optional[Dict[str, Any]]  # New field for per-review detailed plan
+    detailed_plan: Optional[Dict[str, Any]]
     persona: Optional[Dict]
     rating: Optional[int]
     review: Optional[str]
@@ -40,19 +47,30 @@ def load_config(config_path: str = 'config/generation_config.yaml') -> Dict:
             return yaml.safe_load(f)
     return {}
 
-config = load_config()
-provider = os.getenv('LLM_PROVIDER', 'google').lower() # Renamed to LLM_PROVIDER as per user request
+# Global placeholders for agents
+planner = None
+generator_agent = None
+reviewer_agent = None
+comparator_agent = None
 
-# Instantiate Agents
-planner = PlannerAgent(config=config)
-generator_agent = GeneratorAgent(config=config, provider=provider)
-reviewer_agent = ReviewerAgent(config=config, provider=provider) 
-comparator_agent = ComparatorAgent(config=config)
+def get_agents():
+    global planner, generator_agent, reviewer_agent, comparator_agent
+    if planner is None:
+        config = load_config()
+        provider1 = os.getenv('LLM_PROVIDER1', 'google').lower()
+        provider2 = os.getenv('LLM_PROVIDER2', 'groq').lower()
+
+        planner = PlannerAgent(config=config)
+        generator_agent = GeneratorAgent(config=config, provider=provider1)
+        reviewer_agent = ReviewerAgent(config=config, provider=provider1)
+        comparator_agent = ComparatorAgent(config=config)
+    return planner, generator_agent, reviewer_agent, comparator_agent
 
 
 # ----- 3. Nodes -----
 
 def planner_node(state: ReviewState) -> ReviewState:
+    planner, _, _, _ = get_agents()
     print(f"\n╔══════════════════════════════════════════════════════════════╗")
     print(f"║ 📋 GLOBAL PLANNER AGENT                                      ║")
     print(f"╠══════════════════════════════════════════════════════════════╣")
@@ -75,6 +93,7 @@ def planner_node(state: ReviewState) -> ReviewState:
 
 def review_planner_node(state: ReviewState) -> ReviewState:
     """Detailed planner for a SINGLE review."""
+    planner, _, _, _ = get_agents()
     current_item = state['plan'][state['current_index']]
     
     print(f"\n╔══════════════════════════════════════════════════════════════╗")
@@ -101,6 +120,7 @@ def review_planner_node(state: ReviewState) -> ReviewState:
     }
 
 def generator_node(state: ReviewState) -> ReviewState:
+    _, generator_agent, _, _ = get_agents()
     plan = state['detailed_plan']
     
     print(f"\n┌──────────────────────────────────────────────────────────────┐")
@@ -122,6 +142,7 @@ def generator_node(state: ReviewState) -> ReviewState:
     }
 
 def reviewer_node(state: ReviewState) -> ReviewState:
+    _, _, reviewer_agent, _ = get_agents()
     print(f"\n┌──────────────────────────────────────────────────────────────┐")
     print(f"│ 🔍 REVIEWER AGENT                                            │")
     print(f"├──────────────────────────────────────────────────────────────┤")
@@ -129,7 +150,7 @@ def reviewer_node(state: ReviewState) -> ReviewState:
     assessment = reviewer_agent.review_review(
         review_text=state["review"],
         rating=state["detailed_plan"]["target_rating"],
-        persona={"name": state["detailed_plan"]["persona_name"]} 
+        plan=state["detailed_plan"]
     )
     
     score = assessment.get('overall_score', 0)
@@ -147,7 +168,11 @@ def reviewer_node(state: ReviewState) -> ReviewState:
     return {**state, "quality_assessment": assessment}
 
 def finalize_node(state: ReviewState) -> ReviewState:
-    action = "✅ Accepted" if state["quality_assessment"].get("pass") else "⚠️ Accepted (Poor Quality)"
+    from models.review_storage import get_review_storage
+    
+    _, generator_agent, _, _ = get_agents()
+    passed = state["quality_assessment"].get("pass", False)
+    action = "✅ Accepted" if passed else "⚠️ Accepted (Poor Quality)"
     print(f"\n[System]: Review {state['current_index'] + 1} finalized -> {action}")
     
     review_data = {
@@ -159,6 +184,12 @@ def finalize_node(state: ReviewState) -> ReviewState:
         "quality_assessment": state["quality_assessment"],
         "generated_at": datetime.now().isoformat()
     }
+    
+    # Save immediately with embedding when quality passes
+    if passed:
+        storage = get_review_storage()
+        storage.save_review(review_data, compute_embedding=True)
+        print(f"[System]: 💾 Review saved with embedding to storage")
     
     all_synthetic = state.get("all_synthetic_reviews", [])
     all_synthetic.append(review_data)
@@ -175,9 +206,6 @@ def finalize_node(state: ReviewState) -> ReviewState:
 
 async def run_mcp_tool(tool_name: str, arguments: dict):
     """Run a tool via MCP stdio client."""
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
-    
     env = os.environ.copy()
     env["PYTHONPATH"] = os.getcwd() + os.pathsep + env.get("PYTHONPATH", "")
 
@@ -194,16 +222,33 @@ async def run_mcp_tool(tool_name: str, arguments: dict):
             return result.content[0].text
 
 def comparator_node(state: ReviewState) -> ReviewState:
+    _, _, _, comparator_agent = get_agents()
     print(f"\n╔══════════════════════════════════════════════════════════════╗")
     print(f"║ ⚖️  COMPARATOR AGENT & MCP CLIENT                             ║")
     print(f"╠══════════════════════════════════════════════════════════════╣")
     
+    # 0. Post-generation Semantic Filtering (Deduplication)
+    from quality.diversity import DiversityAnalyzer
+    da = DiversityAnalyzer()
+    all_texts = [r['text'] for r in state["all_synthetic_reviews"]]
+    
+    print(f"║ 🔎 Semantic Filtering: Analyzing {len(all_texts)} reviews for redundancy...")
+    keep_indices = da.semantic_deduplication(all_texts, threshold=0.92) # Slightly strict threshold
+    
+    filtered_reviews = [state["all_synthetic_reviews"][i] for i in keep_indices]
+    removed_count = len(all_texts) - len(keep_indices)
+    
+    if removed_count > 0:
+        print(f"║ ✨ Deduplication: Removed {removed_count} near-duplicate reviews.")
+    else:
+        print(f"║ ✅ Deduplication: No redundant reviews found.")
+
     import asyncio
     
     # 1. Compare Dataset
     print(f"║ 🛠️  MCP Client: Calling 'compare_dataset'...")
     comparison_str = asyncio.run(run_mcp_tool("compare_dataset", {
-        "synthetic_reviews": state["all_synthetic_reviews"],
+        "synthetic_reviews": filtered_reviews,
         "real_reviews": state["real_reviews"]
     }))
     comparison = eval(comparison_str) 
@@ -213,7 +258,7 @@ def comparator_node(state: ReviewState) -> ReviewState:
     # 2. Evaluate Batch
     print(f"║ 🛠️  MCP Client: Calling 'evaluate_reviews'...")
     report_str = asyncio.run(run_mcp_tool("evaluate_reviews", {
-        "reviews": state["all_synthetic_reviews"]
+        "reviews": filtered_reviews
     }))
     full_report = eval(report_str)
     
@@ -284,6 +329,24 @@ graph = builder.compile()
 
 
 def run_agentic_workflow(num_reviews: int, real_reviews: List[str] = None):
+    # Ensure agents are instantiated
+    get_agents()
+    
+    config = {}
+    callbacks = []
+    
+    # LangFuse callback
+    try:
+        from monitoring.langfuse_monitoring import get_langfuse_callback
+        langfuse_callback = get_langfuse_callback()
+        if langfuse_callback:
+            callbacks.append(langfuse_callback)
+    except ImportError:
+        pass
+    
+    if callbacks:
+        config["callbacks"] = callbacks
+
     initial_state = {
         "total_reviews": num_reviews,
         "plan": [],
@@ -298,4 +361,15 @@ def run_agentic_workflow(num_reviews: int, real_reviews: List[str] = None):
         "all_synthetic_reviews": [],
         "real_reviews": real_reviews or []
     }
-    return graph.invoke(initial_state)
+    
+    try:
+        result = graph.invoke(initial_state, config=config)
+        # Flush LangFuse events before ending
+        if flush_langfuse:
+            flush_langfuse()
+        return result
+    except Exception as e:
+        # Flush LangFuse events even on failure
+        if flush_langfuse:
+            flush_langfuse()
+        raise e

@@ -1,46 +1,60 @@
 {
   "metadata": {
-    "generated_at": "2026-01-16T18:20:44.189530",
-    "num_synthetic_reviews": 100,
+    "generated_at": "2026-01-16T20:13:57.443203",
+    "num_synthetic_reviews": 500,
     "num_real_reviews": 0,
     "provider": "google/gemini-2.0-flash-001"
   },
   "quality_score": {
-    "overall": 46.53,
+    "overall": 61.63,
     "breakdown": {
-      "diversity": 38.42,
-      "bias": 50,
-      "realism": 50
+      "diversity": 36.26,
+      "bias": 70,
+      "realism": 75
     },
-    "grade": "F (Unacceptable)"
+    "grade": "D (Poor)"
   },
   "diversity": {
     "vocabulary": {
-      "type_token_ratio": 0.212,
-      "unique_tokens": 479,
-      "total_tokens": 2259,
-      "avg_unique_per_review": 21.09,
-      "top_10_token_ratio": 0.2824
+      "type_token_ratio": 0.1235,
+      "unique_tokens": 1494,
+      "total_tokens": 12102,
+      "avg_unique_per_review": 22.88,
+      "top_10_token_ratio": 0.2138
     },
     "semantic_similarity": {
-      "avg_similarity": 0.4435,
-      "max_similarity": 0.8307,
-      "min_similarity": 0.0639,
-      "std_similarity": 0.1529
+      "avg_similarity": 0.3983,
+      "max_similarity": 0.7935,
+      "min_similarity": 0.0626,
+      "std_similarity": 0.1259,
+      "embedding_diversity": 0.6017
     },
     "tfidf_similarity": {
-      "avg_tfidf_similarity": 0.0599,
-      "std_tfidf_similarity": 0.0731
+      "avg_tfidf_similarity": 0.049,
+      "std_tfidf_similarity": 0.0554
+    },
+    "lexical_diversity": {
+      "distinct_1": 0.207,
+      "distinct_2": 0.819,
+      "distinct_3": 1.663,
+      "ngram_entropy_2": 8.3813,
+      "normalized_ngram_entropy_2": 0.8933,
+      "compression_ratio_diversity": 0.2817
+    },
+    "dcscore": 0.0036,
+    "cluster_inertia": 216.18,
+    "syntactic_diversity": {
+      "cr_pos_diversity": 0.2077
     }
   },
   "bias": {
     "rating_distribution": {
       "actual_distribution": {
-        "1": 0.16,
-        "2": 0.16,
-        "3": 0.18,
-        "4": 0.31,
-        "5": 0.19
+        "1": 0.208,
+        "2": 0.216,
+        "3": 0.164,
+        "4": 0.234,
+        "5": 0.178
       },
       "expected_distribution": {
         "1": 0.2,
@@ -50,40 +64,65 @@
         "5": 0.2
       },
       "deviations": {
-        "1": 0.04,
-        "2": 0.04,
-        "3": 0.02,
-        "4": 0.11,
-        "5": 0.01
+        "1": 0.008,
+        "2": 0.016,
+        "3": 0.036,
+        "4": 0.034,
+        "5": 0.022
       },
-      "total_deviation": 0.22,
-      "is_biased": true
+      "total_deviation": 0.116,
+      "is_biased": false
     },
     "sentiment_consistency": {
-      "total_reviews": 100,
-      "inconsistencies_found": 0,
-      "inconsistency_rate": 0.0,
+      "total_reviews": 500,
+      "inconsistencies_found": 11,
+      "inconsistency_rate": 0.022,
       "is_consistent": true,
-      "examples": []
+      "examples": [
+        {
+          "rating": 5,
+          "issue": "High rating but negative sentiment",
+          "pos_words": 0,
+          "neg_words": 1
+        },
+        {
+          "rating": 5,
+          "issue": "High rating but negative sentiment",
+          "pos_words": 0,
+          "neg_words": 1
+        },
+        {
+          "rating": 5,
+          "issue": "High rating but negative sentiment",
+          "pos_words": 0,
+          "neg_words": 1
+        },
+        {
+          "rating": 1,
+          "issue": "Low rating but positive sentiment",
+          "pos_words": 1,
+          "neg_words": 0
+        },
+        {
+          "rating": 1,
+          "issue": "Low rating but positive sentiment",
+          "pos_words": 1,
+          "neg_words": 0
+        }
+      ]
     },
     "repetitive_patterns": {
-      "total_reviews": 100,
-      "unique_reviews": 100,
+      "total_reviews": 500,
+      "unique_reviews": 500,
       "duplicate_rate": 0.0,
-      "repetitive_phrases": [
-        {
-          "phrase": "for the price,",
-          "count": 17,
-          "frequency": 0.17
-        }
-      ],
+      "repetitive_phrases": [],
       "has_repetition_issues": false
     },
     "length_distribution": {
-      "avg_length": 22.93,
-      "std_length": 4.19,
+      "avg_length": 24.75,
+      "std_length": 5.51,
       "min_length": 12,
-      "max_length": 35,
+      "max_length": 43,
       "is_too_uniform": true
     },
     "overall_bias_detected": true
@@ -91,47 +130,45 @@
   "realism": {
     "aspect_coverage": {
       "aspect_mentions": {
-        "sound quality": 13,
-        "battery life": 23,
+        "sound quality": 75,
+        "battery life": 102,
         "bass performance": 0,
         "connectivity range": 0,
-        "mic quality": 5,
-        "noise cancellation": 0,
+        "mic quality": 6,
+        "noise cancellation": 4,
         "ear bud comfort": 0
       },
-      "reviews_with_aspects": 40,
-      "total_reviews": 100,
-      "coverage_rate": 0.4,
-      "avg_mentions_per_aspect": 5.86,
+      "reviews_with_aspects": 178,
+      "total_reviews": 500,
+      "coverage_rate": 0.356,
+      "avg_mentions_per_aspect": 26.71,
       "has_good_coverage": false
     },
     "readability": {
-      "avg_flesch_score": 67.37,
-      "min_score": 28.84,
-      "max_score": 96.76,
-      "interpretation": "Standard",
+      "avg_flesch_score": 53.63,
+      "min_score": -24.85,
+      "max_score": 93.54,
+      "interpretation": "Fairly Difficult",
       "is_natural": true
     },
     "ai_patterns": {
       "reviews_with_ai_patterns": 0,
-      "total_reviews": 100,
+      "total_reviews": 500,
       "ai_pattern_rate": 0.0,
       "is_realistic": true,
       "examples": []
     },
     "pronoun_usage": {
-      "reviews_with_pronouns": 50,
-      "total_reviews": 100,
-      "pronoun_usage_rate": 0.5,
-      "is_natural": false
+      "reviews_with_pronouns": 276,
+      "total_reviews": 500,
+      "pronoun_usage_rate": 0.552,
+      "is_natural": true
     },
     "overall_realistic": false
   },
   "comparison_with_real": null,
   "recommendations": [
     "Limited vocabulary diversity. Encourage more varied word choices in prompts.",
-    "Rating distribution deviates from expected. Adjust generation parameters or sampling.",
-    "Low product aspect coverage. Emphasize relevant aspects in generation prompts.",
-    "Low personal pronoun usage. Encourage first-person perspective in prompts."
+    "Low product aspect coverage. Emphasize relevant aspects in generation prompts."
   ]
 }

@@ -30,8 +30,8 @@ class GroqClient:
                 chat_completion = self.client.chat.completions.create(
                     messages=[{"role": "user", "content": prompt}],
                     model=kwargs.get('model', self.model_name),
-                    temperature=params.get('temperature', 0.9),
-                    top_p=params.get('top_p', 0.9),
+                    temperature=params.get('temperature', 0.1),
+                    top_p=params.get('top_p', 0.95),
                     max_tokens=params.get('max_tokens', 200),
                 )
                 return chat_completion.choices[0].message.content.strip()

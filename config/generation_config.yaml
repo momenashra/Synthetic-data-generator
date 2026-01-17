@@ -1,77 +1,193 @@
 # Configuration for synthetic review generation
 
 # Number of reviews to generate
-num_reviews: 100
+num_reviews: 500
 
-# Rating distribution from AllProductReviews.csv
+# 1. Broaden Rating Distribution to match real-world data variety
+# rating_distribution:
+#   1: 0.17  # Matches real-world distribution for better realism 
+#   2: 0.07
+#   3: 0.10
+#   4: 0.22
+#   5: 0.44
+actual_distribution:
+  1: 0.2  
+  2: 0.2
+  3: 0.2
+  4: 0.2
+  5: 0.2
 rating_distribution:
-  # 1: 0.173886
-  # 2: 0.065495
-  # 3: 0.104834
-  # 4: 0.222431
-  # 5: 0.433354
-  1: 0.2
+  1: 0.2  
   2: 0.2
   3: 0.2
   4: 0.2
   5: 0.2
 
-# Headphone-specific reviewer personas
+# 2. Advanced Attribute Generation [1]
+# Instead of fixed personas only, your agent should mix and match these:
+attributes:
+  writing_styles:
+    - "minimalist and blunt"
+    - "highly technical and verbose"
+    - "emotional and storytelling-focused"
+    - "comparative (contrasting with other brands)"
+    - "sarcastic and skeptical"
+
+  emotional_contexts:
+    - "frustrated due to a specific failure"
+    - "pleasantly surprised after low expectations"
+    - "loyal fan of the brand"
+    - "indifferent but practical"
+    - "regretful about the purchase"
+
+  usage_locations:
+    - "during a noisy daily commute on a train" 
+    - "in a completely silent library" 
+    - "intensive sweating at a humid gym" 
+    - "long-haul international flight"
+    - "back-to-back professional video calls" 
+
+# 3. Enhanced Personas with "Semantic Anchors"
 personas:
   - name: "audiophile"
-    description: "Sound quality purist who cares about frequency response and clarity"
-    traits:
-      - "critically analyzes soundstage and imaging"
-      - "mentions highs, mids, and lows"
-      - "discusses technical audio specs"
-    
-  - name: "fitness_enthusiast"
-    description: "Uses earphones during intensive workouts and running"
-    traits:
-      - "focuses on fit stability and sweat resistance"
-      - "mentions bass for workout motivation"
-      - "values durability and long battery life"
-    
+    description: "Sound quality purist who cares about frequency response and clarity" 
+    semantic_anchors: ["imaging", "soundstage", "highs/mids/lows", "distortion"] # Force these terms
+  
   - name: "wfh_professional"
-    description: "Uses headphones for long zoom calls and focused office work"
-    traits:
-      - "emphasizes mic quality and comfort for 8+ hours"
-      - "mentions background noise cancellation"
-      - "values reliable multi-device connectivity"
-    
-  - name: "bass_head"
-    description: "Loves EDM and hip-hop, cares mostly about heavy bass"
-    traits:
-      - "uses informal, enthusiastic language"
-      - "specifically mentions 'thumping bass' or 'deep lows'"
-      - "less critical of technical clarity, more focusing on impact"
-    
-  - name: "budget_commuter"
-    description: "Daily traveler looking for decent sound at a low price"
-    traits:
-      - "compares value for money extensively"
-      - "mentions using them in public transport"
-      - "straightforward and practical writing style"
+    description: "Uses headphones for long zoom calls and office work" 
+    semantic_anchors: ["background cancellation", "mic pickup", "multipoint pairing", "8-hour comfort"]
+  
+  - name: "fitness_enthusiast"
+    description: "Uses headphones during workouts, running, and gym sessions"
+    semantic_anchors: ["sweat resistance", "secure fit", "battery life", "durability"]
+  
+  - name: "commuter"
+    description: "Daily commuter who uses headphones on public transport"
+    semantic_anchors: ["noise cancellation", "portability", "quick pairing", "comfort for long rides"]
+  
+  - name: "budget_conscious"
+    description: "Price-sensitive buyer looking for value"
+    semantic_anchors: ["value for money", "affordability", "basic features", "durability"]
+  
+  - name: "tech_enthusiast"
+    description: "Early adopter interested in latest features and technology"
+    semantic_anchors: ["latest codecs", "app features", "customization", "connectivity options"]
+  
+  - name: "casual_listener"
+    description: "Everyday user who just wants decent sound for music and calls"
+    semantic_anchors: ["ease of use", "comfort", "decent sound", "reliability"]
+  
+  - name: "gamer"
+    description: "Gamer who needs headphones for gaming sessions"
+    semantic_anchors: ["low latency", "spatial audio", "mic quality", "long sessions"]
 
+# 4. Critical Generation Parameters
+generation_params:
+  temperature: 1  # Slightly increased to encourage "less obvious" word choices [1, 5]
+  top_p: 0.95        # Nucleus sampling to allow for a wider vocabulary [1, 5]
+  max_tokens: 100    # Increased from 70 to allow for more descriptive 
 # Review characteristics
 review_length:
   min_words: 5
   max_words: 50
 
-# Temperature settings for generation
-generation_params:
-  temperature: 0.75
-  max_tokens: 70
-  top_p: 0.9
+
 
 # Product context (aligned with boAt/Sennheiser/JBL headphones in CSV)
 product_context:
   category: "Wireless Bluetooth Earphones/Headphones"
   aspects:
+    # Audio Performance
     - "sound quality"
+    - "bass response and depth"
+    - "treble clarity"
+    - "mid-range accuracy"
+    - "soundstage and imaging"
+    - "audio codec support" # aptX, LDAC, AAC
+    - "volume levels and loudness"
+    - "sound leakage"
+    - "audio distortion at high volume"
+    
+    # Battery & Charging
     - "battery life"
-    - "bass performance"
+    - "charging speed"
+    - "charging case battery capacity"
+    - "battery life consistency"
+    - "charging port type" # USB-C, Lightning, Micro-USB
+    - "wireless charging support"
+    - "battery degradation over time"
+    - "quick charge feature"
+    
+    # Connectivity
+    - "Bluetooth version and stability"
     - "connectivity range"
-    - "mic quality"
-    - "noise cancellation"
-    - "ear bud comfort"
+    - "pairing ease and speed"
+    - "multi-device connectivity"
+    - "connection dropouts"
+    - "latency and lag" # especially for gaming/video
+    - "NFC pairing support"
+    
+    # Microphone & Calls
+    - "microphone quality"
+    - "call clarity"
+    - "voice pickup accuracy"
+    - "wind noise reduction during calls"
+    - "background noise suppression"
+    
+    # Noise Cancellation & Isolation
+    - "active noise cancellation (ANC) effectiveness"
+    - "passive noise isolation"
+    - "ambient/transparency mode quality"
+    - "ANC impact on battery life"
+    - "adaptive ANC performance"
+    
+    # Comfort & Fit
+    - "earbud/ear cup comfort"
+    - "fit security and stability"
+    - "ear tip sizes and variety"
+    - "weight and bulk"
+    - "pressure and clamping force" # for over-ear
+    - "long-wear comfort" # 2+ hours
+    - "suitability for different ear sizes"
+    - "comfort with glasses" # for over-ear
+    
+    # Build Quality & Design
+    - "build quality and materials"
+    - "durability and longevity"
+    - "water/sweat resistance rating" # IPX ratings
+    - "hinge and folding mechanism" # for foldable models
+    - "case build quality"
+    - "aesthetic design and looks"
+    - "color options"
+    - "premium feel"
+    
+    # Controls & Features
+    - "touch/button controls responsiveness"
+    - "control customization options"
+    - "app functionality and features"
+    - "equalizer settings"
+    - "firmware update support"
+    - "voice assistant integration" # Siri, Google Assistant, Alexa
+    - "auto pause/play detection"
+    - "find my earbuds feature"
+    
+    # Value & Price
+    - "price to performance ratio"
+    - "value for money"
+    - "comparison to competitors at similar price"
+    - "warranty and customer support"
+    - "availability of replacement parts"
+    
+    # Use Case Specific
+    - "workout and gym suitability"
+    - "running and sports performance"
+    - "commuting and travel comfort"
+    - "gaming performance" # low latency
+    - "office/work calls suitability"
+    - "airplane/public transport noise blocking"
+    
+    # Packaging & Accessories
+    - "packaging quality"
+    - "included accessories" # extra tips, cables, case
+    - "carrying case quality and size"
+    - "unboxing experience"

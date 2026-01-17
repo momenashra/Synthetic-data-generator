@@ -20,8 +20,8 @@ class OllamaClient:
             model=kwargs.get('model', self.model_name),
             messages=[{'role': 'user', 'content': prompt}],
             options={
-                'temperature': params.get('temperature', 0.8),
-                'top_p': params.get('top_p', 0.9),
+                'temperature': params.get('temperature', 1),
+                'top_p': params.get('top_p', 0.95),
                 'num_predict': params.get('max_tokens', 200),
             }
         )

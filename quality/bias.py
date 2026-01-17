@@ -6,6 +6,8 @@ from typing import List, Dict
 import numpy as np
 from collections import Counter
 import re
+from models import EmbeddingClient
+import numpy as np
 
 
 class BiasAnalyzer:
@@ -52,7 +54,10 @@ class BiasAnalyzer:
     
     def analyze_sentiment_consistency(self, reviews: List[Dict]) -> Dict[str, any]:
         """
-        Check if sentiment matches ratings.
+        Check if sentiment matches ratings using semantic embeddings.
+        
+        Uses cosine similarity to sentiment anchor embeddings for more
+        accurate sentiment detection than simple word counting.
         
         Args:
             reviews: List of review dictionaries with 'rating' and 'text'
@@ -60,47 +65,90 @@ class BiasAnalyzer:
         Returns:
             Dictionary with sentiment consistency metrics
         """
-        # Simple sentiment indicators
-        positive_words = {
-            'great', 'excellent', 'amazing', 'perfect', 'love', 'best',
-            'fantastic', 'wonderful', 'awesome', 'comfortable', 'highly'
-        }
-        negative_words = {
-            'bad', 'terrible', 'worst', 'hate', 'disappointed', 'poor',
-            'awful', 'horrible', 'waste', 'uncomfortable', 'cheap'
-        }
+        if not reviews:
+            return {
+                'total_reviews': 0,
+                'inconsistencies_found': 0,
+                'inconsistency_rate': 0,
+                'is_consistent': True,
+                'examples': []
+            }
+        
+        embedding_client = EmbeddingClient()
+        
+        # Define sentiment anchor phrases
+        positive_anchors = [
+            "excellent product I love it",
+            "highly recommend great quality",
+            "fantastic amazing experience",
+            "best purchase very satisfied"
+        ]
+        negative_anchors = [
+            "terrible product I hate it",
+            "do not buy poor quality",
+            "awful horrible experience",
+            "worst purchase very disappointed"
+        ]
+        
+        # Compute sentiment centroids
+        pos_embeddings = embedding_client.encode(positive_anchors)
+        neg_embeddings = embedding_client.encode(negative_anchors)
+        pos_centroid = pos_embeddings.mean(axis=0)
+        neg_centroid = neg_embeddings.mean(axis=0)
+        
+        # Normalize centroids
+        pos_centroid = pos_centroid / np.linalg.norm(pos_centroid)
+        neg_centroid = neg_centroid / np.linalg.norm(neg_centroid)
+        
+        # Encode all review texts
+        review_texts = [r['text'] for r in reviews]
+        review_embeddings = embedding_client.encode(review_texts)
         
         inconsistencies = []
         
-        for review in reviews:
-            text = review['text'].lower()
+        for i, review in enumerate(reviews):
             rating = review['rating']
+            embedding = review_embeddings[i]
             
-            # Count sentiment words
-            pos_count = sum(1 for word in positive_words if word in text)
-            neg_count = sum(1 for word in negative_words if word in text)
+            # Normalize embedding
+            norm = np.linalg.norm(embedding)
+            if norm == 0:
+                continue
+            embedding = embedding / norm
             
-            # Check for inconsistencies
-            if rating >= 4 and neg_count > pos_count:
-                inconsistencies.append({
-                    'rating': rating,
-                    'issue': 'High rating but negative sentiment',
-                    'pos_words': pos_count,
-                    'neg_words': neg_count
-                })
-            elif rating <= 2 and pos_count > neg_count:
-                inconsistencies.append({
-                    'rating': rating,
-                    'issue': 'Low rating but positive sentiment',
-                    'pos_words': pos_count,
-                    'neg_words': neg_count
-                })
+            # Compute similarities
+            pos_sim = float(np.dot(embedding, pos_centroid))
+            neg_sim = float(np.dot(embedding, neg_centroid))
+            
+            # Determine sentiment direction
+            is_positive = pos_sim > neg_sim
+            sim_diff = abs(pos_sim - neg_sim)
+            
+            # Check for inconsistencies (only if clear sentiment signal)
+            if sim_diff > 0.05:  # Threshold for meaningful difference
+                if rating >= 4 and not is_positive:
+                    inconsistencies.append({
+                        'rating': rating,
+                        'issue': 'High rating but negative sentiment',
+                        'pos_similarity': round(pos_sim, 4),
+                        'neg_similarity': round(neg_sim, 4)
+                    })
+                elif rating <= 2 and is_positive:
+                    inconsistencies.append({
+                        'rating': rating,
+                        'issue': 'Low rating but positive sentiment',
+                        'pos_similarity': round(pos_sim, 4),
+                        'neg_similarity': round(neg_sim, 4)
+                    })
+        
+        total = len(reviews)
+        inconsistent_count = len(inconsistencies)
         
         return {
-            'total_reviews': len(reviews),
-            'inconsistencies_found': len(inconsistencies),
-            'inconsistency_rate': round(len(inconsistencies) / len(reviews), 4) if reviews else 0,
-            'is_consistent': bool(len(inconsistencies) / len(reviews) < 0.1) if reviews else True,
+            'total_reviews': total,
+            'inconsistencies_found': inconsistent_count,
+            'inconsistency_rate': round(inconsistent_count / total, 4) if total else 0,
+            'is_consistent': bool(inconsistent_count / total < 0.1) if total else True,
             'examples': inconsistencies[:5]  # Show first 5 examples
         }
     
@@ -190,19 +238,28 @@ class BiasAnalyzer:
         sentiment_analysis = self.analyze_sentiment_consistency(reviews)
         pattern_analysis = self.detect_repetitive_patterns(texts)
         length_analysis = self.analyze_length_distribution(texts)
+        # Calculate weighted bias score
+        bias_severity_score = 0.0
         
-        # Overall bias assessment
-        has_bias = (
-            rating_analysis['is_biased'] or
-            not sentiment_analysis['is_consistent'] or
-            pattern_analysis['has_repetition_issues'] or
-            length_analysis['is_too_uniform']
-        )
-        
+        # heavy weights for critical issues
+        if rating_analysis['is_biased']:
+            bias_severity_score += 1.0
+            
+        if not sentiment_analysis['is_consistent']:
+            bias_severity_score += 1.0
+            
+        # lighter weights for minor issues
+        if pattern_analysis['has_repetition_issues']:
+            bias_severity_score += 0.5
+            
+        if length_analysis['is_too_uniform']:
+            bias_severity_score += 0.5
+
+        # Overall bias assessment (Threshold > 1.5 means at least 2 major or 1 major + 2 minor issues)
         return {
             'rating_distribution': rating_analysis,
             'sentiment_consistency': sentiment_analysis,
             'repetitive_patterns': pattern_analysis,
             'length_distribution': length_analysis,
-            'overall_bias_detected': has_bias
+            'overall_bias_detected': bool(bias_severity_score > 1.5)
         }

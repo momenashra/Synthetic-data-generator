@@ -9,11 +9,6 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from build_graph import run_agentic_workflow
 
-
-
-
-
-
 def load_config(config_path: str = 'config/generation_config.yaml') -> Dict:
     """Load configuration from YAML file."""
     with open(config_path, 'r') as f:
@@ -66,7 +61,7 @@ def generate_reviews(
     real_reviews = load_real_reviews(real_reviews_path)
     
     # Run the full agentic workflow
-    print(f"\n🚀 Starting Agentic Review Generation Strategy...")
+    print(f"\n Starting Agentic Review Generation Strategy...")
     result = run_agentic_workflow(
         num_reviews=num_reviews,
         real_reviews=real_reviews
